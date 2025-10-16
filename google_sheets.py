@@ -1,22 +1,18 @@
-# Файл: google_sheets.py
-
 import gspread_asyncio
 from google.oauth2.service_account import Credentials
 from config import Config
 import logging
 
-# Настройка логирования
+
 logger = logging.getLogger(__name__)
 
 def get_creds():
-    # Эта функция получает учетные данные из вашего JSON-файла.
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
     return Credentials.from_service_account_file(Config.GOOGLE_CREDS_JSON, scopes=scopes)
 
-# Создаем асинхронный менеджер клиентов
 agcm = gspread_asyncio.AsyncioGspreadClientManager(get_creds)
 
 async def get_sheets():
@@ -38,13 +34,11 @@ async def add_user_to_sheet(user_data: dict):
         return
 
     try:
-        # Проверяем, есть ли заголовки
         header = await users_sheet.row_values(1)
         if not header:
             headers = ["ID Пользователя", "Username", "Полное имя", "Роль", "Сфера", "О себе", "Портфолио", "Дата регистрации"]
             await users_sheet.append_row(headers)
 
-        # Формируем строку для записи
         row = [
             user_data.get('user_id'),
             user_data.get('username'),
@@ -67,7 +61,6 @@ async def add_order_to_sheet(order_data: dict, employer_username: str):
         return
 
     try:
-        # Проверяем, есть ли заголовки
         header = await orders_sheet.row_values(1)
         if not header:
             headers = ["ID Заказа", "ID Заказчика", "Username Заказчика", "Название", "Описание", "Дата создания", "Статус"]
