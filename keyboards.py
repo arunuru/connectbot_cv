@@ -1,9 +1,5 @@
-# Файл: keyboards.py
-
 from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
                            InlineKeyboardMarkup, InlineKeyboardButton)
-
-# --- Reply-клавиатуры (основные кнопки) ---
 
 def get_main_menu_keyboard():
     return ReplyKeyboardMarkup(
@@ -31,8 +27,6 @@ def get_confirm_publication_keyboard():
         resize_keyboard=True,
         one_time_keyboard=True
     )
-
-# --- Inline-клавиатуры (кнопки под сообщениями) ---
 
 def get_profile_keyboard():
     return InlineKeyboardMarkup(
