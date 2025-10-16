@@ -1,4 +1,3 @@
-# Файл: bot.py
 
 import logging
 import asyncio
@@ -12,23 +11,23 @@ from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandStart
 
-# Импортируем наши модули
+
 from config import Config
 import keyboards as kb
 import google_sheets as gs
 from database import (async_session, create_tables, users, orders, applications, viewed_orders,
                         select, update, delete, and_, insert)
 
-# --- Настройка логирования ---
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Инициализация бота и диспетчера ---
+
 storage = MemoryStorage()
 bot = Bot(token=Config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=storage)
 
-# --- FSM Состояния (машина состояний) ---
+
 
 class Registration(StatesGroup):
     full_name = State()
@@ -47,7 +46,7 @@ class ProfileEditing(StatesGroup):
     field = State()
     new_value = State()
 
-# --- Вспомогательные функции ---
+
 
 async def get_user(user_id: int):
     """Получает пользователя из БД."""
@@ -71,7 +70,7 @@ def format_user_profile(user_data) -> str:
         f"<b>✈️ TG:</b> @{user_data.username}"
     )
 
-# --- Обработчики событий в группе ---
+
 
 @dp.message(F.new_chat_members)
 async def on_user_joined(message: types.Message):
@@ -87,7 +86,6 @@ async def on_user_joined(message: types.Message):
             logger.info(f"Приветствие для нового пользователя {user.id} в группе {message.chat.id}")
 
 
-# --- РЕГИСТРАЦИЯ И СТАРТ ---
 
 @dp.message(CommandStart())
 async def handle_start(message: types.Message, state: FSMContext):
@@ -104,7 +102,6 @@ async def handle_start(message: types.Message, state: FSMContext):
             reply_markup=types.ReplyKeyboardRemove()
         )
 
-# ... (Остальные шаги регистрации)
 
 @dp.message(Registration.full_name)
 async def process_name(message: types.Message, state: FSMContext):
@@ -177,7 +174,7 @@ async def process_final_registration(message: types.Message, state: FSMContext):
         reply_markup=kb.get_main_menu_keyboard()
     )
 
-    # Отправка в Google Sheets
+
     try:
         await gs.add_user_to_sheet(db_data)
     except Exception as e:
@@ -232,7 +229,7 @@ async def process_order_photo(message: types.Message, state: FSMContext):
     logger.info(f"Заказ {order_id} от пользователя {message.from_user.id} создан.")
     await message.answer(f"✅ Заказ «{order_data['title']}» успешно создан!", reply_markup=kb.get_main_menu_keyboard())
 
-    # Отправка в Google Sheets
+
     db_data['order_id'] = order_id
     try:
         await gs.add_order_to_sheet(db_data, employer.username)
@@ -241,7 +238,7 @@ async def process_order_photo(message: types.Message, state: FSMContext):
         if Config.ADMIN_ID:
             await bot.send_message(Config.ADMIN_ID, f"⚠️ Не удалось добавить заказ в Google Sheets.\n\nЗаказ: {order_id}\nОшибка: {e}")
 
-    # Публикация в группу
+
     if Config.NETWORKING_GROUP_ID:
         try:
             order_text = (
@@ -266,7 +263,7 @@ async def process_order_photo(message: types.Message, state: FSMContext):
 
     await state.clear()
 
-# --- ОСНОВНОЕ МЕНЮ ---
+
 
 @dp.message(F.text == "👤 Мой профиль")
 async def handle_my_profile(message: types.Message):
@@ -338,7 +335,7 @@ async def handle_create_order(message: types.Message, state: FSMContext):
     await state.set_state(OrderCreation.title)
     await message.answer("Введите название для вашего заказа (например, 'Разработать логотип для кофейни').", reply_markup=types.ReplyKeyboardRemove())
 
-# ... (Остальные шаги создания заказа)
+
 @dp.message(OrderCreation.title)
 async def process_order_title(message: types.Message, state: FSMContext):
     await state.update_data(title=message.text)
@@ -352,7 +349,6 @@ async def process_order_description(message: types.Message, state: FSMContext):
     await message.answer("Прикрепите фото или референс, если нужно. Если нет — отправьте прочерк '-'.")
 
 
-# --- ПОИСК РАБОТЫ ---
 
 async def show_next_order(message_or_call: types.Message | types.CallbackQuery, state: FSMContext):
     """Показывает следующий доступный заказ."""
@@ -360,13 +356,12 @@ async def show_next_order(message_or_call: types.Message | types.CallbackQuery, 
     message = message_or_call if isinstance(message_or_call, types.Message) else message_or_call.message
 
     async with async_session() as session:
-        # Сначала получим ID заказов, которые пользователь уже видел в этой сессии
+     
         viewed_result = await session.execute(
             select(viewed_orders.c.order_id).where(viewed_orders.c.viewer_id == user_id)
         )
         viewed_ids = [row[0] for row in viewed_result]
-
-        # Ищем новый заказ
+      
         time_limit = datetime.now() - timedelta(hours=Config.ORDER_LIFETIME_HOURS)
         query = (
             select(orders, users.c.full_name, users.c.username)
@@ -387,7 +382,7 @@ async def show_next_order(message_or_call: types.Message | types.CallbackQuery, 
 
     if order:
         await state.update_data(current_order_id=order.order_id)
-        # Отмечаем заказ как просмотренный
+      
         async with async_session() as session:
             await session.execute(insert(viewed_orders).values(viewer_id=user_id, order_id=order.order_id))
             await session.commit()
@@ -403,14 +398,11 @@ async def show_next_order(message_or_call: types.Message | types.CallbackQuery, 
         else:
             await message.answer(text, reply_markup=kb.get_job_search_keyboard(order.order_id))
     else:
-        # Если новых заказов нет, сбрасываем историю просмотров и пробуем еще раз
         async with async_session() as session:
             await session.execute(delete(viewed_orders).where(viewed_orders.c.viewer_id == user_id))
             await session.commit()
-        
-        # Повторяем поиск. Если снова пусто, значит заказов нет в принципе.
         async with async_session() as session:
-            # Ищем снова, но уже без учёта просмотренных, так как мы их очистили
+
             fresh_query = query.where(orders.c.order_id.notin_([])) 
             result = await session.execute(fresh_query)
             order = result.fetchone()
@@ -428,7 +420,7 @@ async def apply_for_job(call: types.CallbackQuery, state: FSMContext):
     worker = await get_user(call.from_user.id)
     
     async with async_session() as session:
-        # Получаем информацию о заказе и его владельце
+
         result = await session.execute(select(orders).where(orders.c.order_id == order_id))
         order = result.fetchone()
 
@@ -436,7 +428,7 @@ async def apply_for_job(call: types.CallbackQuery, state: FSMContext):
         await call.answer("Произошла ошибка, заказ или профиль не найден.", show_alert=True)
         return
 
-    # Отправляем уведомление заказчику
+
     try:
         profile_text = format_user_profile(worker)
         await bot.send_message(
@@ -449,7 +441,7 @@ async def apply_for_job(call: types.CallbackQuery, state: FSMContext):
         logger.error(f"Не удалось отправить отклик от {worker.user_id} на заказ {order_id}: {e}")
         await call.answer("Не удалось отправить отклик. Возможно, заказчик заблокировал бота.", show_alert=True)
     
-    # Показываем следующий заказ
+
     await call.message.delete()
     await show_next_order(call, state)
 
@@ -465,7 +457,7 @@ async def stop_search(call: types.CallbackQuery, state: FSMContext):
     await call.message.answer("Поиск завершен.", reply_markup=kb.get_main_menu_keyboard())
 
 
-# --- УПРАВЛЕНИЕ ЗАКАЗАМИ (Callbacks) ---
+
 
 @dp.callback_query(F.data.startswith('close_order_'))
 async def close_order(call: types.CallbackQuery):
@@ -501,9 +493,7 @@ async def delete_order_prompt(call: types.CallbackQuery):
 async def confirm_delete_order(call: types.CallbackQuery):
     order_id = int(call.data.split('_')[2])
     async with async_session() as session:
-        # ВАЖНО: ondelete="CASCADE" в `database.py` должен позаботиться об удалении откликов.
-        # Если нет, то сначала нужно удалить отклики:
-        # await session.execute(delete(applications).where(applications.c.order_id == order_id))
+
         stmt = delete(orders).where(and_(orders.c.order_id == order_id, orders.c.employer_id == call.from_user.id))
         await session.execute(stmt)
         await session.commit()
@@ -516,7 +506,6 @@ async def cancel_delete_order(call: types.CallbackQuery):
     await call.message.answer("Удаление отменено.")
     await call.answer()
 
-# --- РЕДАКТИРОВАНИЕ ПРОФИЛЯ ---
 
 @dp.callback_query(F.data == "edit_profile")
 async def handle_edit_profile(call: types.CallbackQuery):
@@ -532,7 +521,7 @@ async def handle_back_to_profile(call: types.CallbackQuery, state: FSMContext):
     """Возвращает к отображению профиля."""
     await state.clear()
     await call.message.delete()
-    await handle_my_profile(call.message) # Вызываем основной обработчик профиля
+    await handle_my_profile(call.message) 
     await call.answer()
 
 @dp.callback_query(F.data == "toggle_visibility")
@@ -549,7 +538,7 @@ async def handle_toggle_visibility(call: types.CallbackQuery):
     
     await call.answer(f"Ваш профиль теперь {'виден' if new_status else 'скрыт'} в поиске.")
     
-    # Обновляем сообщение с профилем
+
     await call.message.delete()
     await handle_my_profile(call.message)
 
@@ -585,7 +574,7 @@ async def process_new_profile_value(message: types.Message, state: FSMContext):
     
     value = message.text
     
-    # Обрабатываем выбор роли
+
     if field == "role":
         role_map = {
             "Я ищу работу (Исполнитель)": "worker",
@@ -598,7 +587,6 @@ async def process_new_profile_value(message: types.Message, state: FSMContext):
             return
         value = role
 
-    # Для портфолио обрабатываем прочерк
     if field == "portfolio" and value == "-":
         value = None
         
@@ -611,13 +599,11 @@ async def process_new_profile_value(message: types.Message, state: FSMContext):
     await message.answer("✅ Данные успешно обновлены!", reply_markup=kb.get_main_menu_keyboard())
     
     await state.clear()
-    await handle_my_profile(message) # Показываем обновленный профиль
+    await handle_my_profile(message) 
 
-# --- ЗАПУСК БОТА ---
 async def main():
     logger.info("Запуск бота...")
-    await create_tables()  # Создаем таблицы при запуске
-    # Очищаем таблицу просмотренных заказов при каждом запуске бота
+    await create_tables() 
     async with async_session() as session:
         await session.execute(delete(viewed_orders))
         await session.commit()
