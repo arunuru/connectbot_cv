@@ -1,0 +1,15 @@
+#библиотека для тг бота
+aiogram==3.10.0
+
+#библиотека для бд
+SQLAlchemy==2.0.30
+
+asyncpg==0.29.0
+
+# для енв
+python-dotenv==1.0.1
+
+# для гугл таблицы апи
+gspread
+gspread-asyncio
+google-auth-oauthlib==1.2.0
